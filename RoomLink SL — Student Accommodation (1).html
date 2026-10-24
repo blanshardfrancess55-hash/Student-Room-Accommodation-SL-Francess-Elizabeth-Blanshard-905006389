@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RoomLink SL — Student Accommodation</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','system-ui','sans-serif']},colors:{navy:'#0A1628',brand:'#1A6EFF',leaf:'#168344',soft:'#F1F5F9',muted:'#64748B'}}}}</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:#fff;color:#0A1628;font-family:Inter,system-ui,sans-serif}
+:focus-visible{outline:3px solid #1A6EFF;outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+/* ---------- Mock data (fictional, for academic demonstration) ---------- */
+const FACILITIES = ["Wi-Fi", "Water supply", "Electricity", "Security"];
+const LISTINGS = [
+  { id: 1, name: "Hilltop Student Lodge", area: "Mount Aureol", city: "Freetown", type: "Single", price: 1800, fac: ["Wi-Fi", "Water supply", "Electricity", "Security"], tone: "from-blue-200 to-blue-400", desc: "A quiet single room close to the hill campus, with a shared kitchen and study corner." },
+  { id: 2, name: "Greenview Residence", area: "Kissy", city: "Freetown", type: "Shared", price: 900, fac: ["Water supply", "Electricity"], tone: "from-green-200 to-green-400", desc: "Two-student shared room with a fan, wardrobe space and a shared bathroom." },
+  { id: 3, name: "Harbour Point Rooms", area: "Aberdeen", city: "Freetown", type: "Single", price: 2400, fac: ["Wi-Fi", "Electricity", "Security"], tone: "from-sky-200 to-sky-400", desc: "Self-contained single room near the coast road with gated entry." },
+  { id: 4, name: "Southern Scholars House", area: "Bo Town", city: "Bo", type: "Shared", price: 700, fac: ["Water supply", "Security"], tone: "from-amber-200 to-amber-400", desc: "Budget-friendly shared room within walking distance of lecture halls." },
+  { id: 5, name: "Northgate Student Court", area: "Makeni Town", city: "Makeni", type: "Single", price: 1200, fac: ["Wi-Fi", "Water supply", "Electricity"], tone: "from-violet-200 to-violet-400", desc: "Simple single room with reliable power and a shared study lounge." },
+  { id: 6, name: "Eastside Campus Annex", area: "Nongowa", city: "Kenema", type: "Shared", price: 800, fac: ["Electricity", "Security", "Water supply"], tone: "from-rose-200 to-rose-400", desc: "Shared room for up to three students with secure compound and storage." },
+].map(l => ({ ...l, phone: "+232 00 000 000 (sample)", email: "sample@roomlink.example" }));
+const money = n => "SLE " + n.toLocaleString() + " / month";
+const EMPTY = { q: "", min: "", max: "", type: "Any", fac: [], sort: "none" };
+
+/* ---------- Small shared pieces ---------- */
+const Btn = ({ variant = "primary", className = "", ...p }) => (
+  <button {...p} className={"rounded-lg px-4 py-2 text-sm font-semibold transition " + (variant === "primary" ? "bg-brand text-white hover:bg-blue-700 " : variant === "green" ? "bg-brand text-white hover:bg-blue-700 " : "border border-slate-300 bg-white text-navy hover:bg-soft ") + className} />
+);
+const Field = ({ label, id, children }) => (
+  <div><label htmlFor={id} className="mb-1 block text-sm font-medium">{label}</label>{children}</div>
+);
+const inp = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
+const Pic = ({ l, big }) => (
+  <div role="img" aria-label={"Neutral placeholder image for " + l.name + " (no photo available)"} className={"flex w-full items-center justify-center bg-soft " + (big ? "aspect-[16/9] rounded-xl" : "aspect-[16/10] rounded-t-xl")}>
+    <svg viewBox="0 0 120 80" className="h-1/2 w-auto text-slate-300" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><rect x="10" y="40" width="100" height="22" rx="3" /><path d="M10 62v8M110 62v8M18 40V28a4 4 0 0 1 4-4h22a4 4 0 0 1 4 4v12M72 40V28a4 4 0 0 1 4-4h22a4 4 0 0 1 4 4v12" /><rect x="40" y="8" width="40" height="12" rx="2" /></svg>
+  </div>
+);
+
+/* ---------- Header / Footer ---------- */
+const NAV = [["home", "Home"], ["about", "About"], ["services", "Services"], ["listings", "Accommodation"], ["contact", "Contact"]];
+function Header({ page, go, count }) {
+  const [open, setOpen] = useState(false);
+  const nav = p => { go(p); setOpen(false); };
+  return (
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        <button onClick={() => nav("home")} className="text-xl font-bold" aria-label="RoomLink SL home">Room<span className="text-brand">Link</span> <span className="text-navy">SL</span></button>
+        <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+          {NAV.map(([k, t]) => <button key={k} onClick={() => nav(k)} aria-current={page === k ? "page" : undefined} className={"rounded-lg px-3 py-2 text-sm font-medium hover:bg-soft " + (page === k ? "text-brand" : "")}>{t}</button>)}
+          <button onClick={() => nav("compare")} aria-current={page === "compare" ? "page" : undefined} className="rounded-lg px-3 py-2 text-sm font-medium hover:bg-soft">Compare ({count})</button>
+          <Btn onClick={() => nav("listings")}>Find a Room</Btn>
+        </nav>
+        <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:hidden" aria-expanded={open} aria-controls="mobile-nav" onClick={() => setOpen(!open)}>{open ? "Close" : "Menu"}</button>
+      </div>
+      {open && (
+        <nav id="mobile-nav" aria-label="Mobile" className="flex flex-col gap-1 border-t border-slate-200 px-4 py-3 md:hidden">
+          {NAV.map(([k, t]) => <button key={k} onClick={() => nav(k)} className="rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-soft">{t}</button>)}
+          <button onClick={() => nav("compare")} className="rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-soft">Compare ({count})</button>
+          <Btn onClick={() => nav("listings")}>Find a Room</Btn>
+        </nav>
+      )}
+    </header>
+  );
+}
+function Footer({ go }) {
+  return (
+    <footer className="mt-16 bg-navy text-slate-300">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 md:grid-cols-3">
+        <div><p className="text-lg font-bold text-white">RoomLink SL</p><p className="mt-2 text-sm">A student-designed concept for exploring and comparing accommodation in Sierra Leone.</p></div>
+        <div><p className="font-semibold text-white">Pages</p><ul className="mt-2 space-y-1 text-sm">{NAV.map(([k, t]) => <li key={k}><button className="hover:text-white" onClick={() => go(k)}>{t}</button></li>)}</ul></div>
+        <div><p className="font-semibold text-white">Contact (placeholder)</p><p className="mt-2 text-sm">hello@roomlink.example<br />+232 00 000 000<br />Freetown, Sierra Leone</p></div>
+      </div>
+      <p className="border-t border-slate-700 py-4 text-center text-xs">© 2026 RoomLink SL — academic prototype. All listings are fictional.</p>
+    </footer>
+  );
+}
+
+/* ---------- Listing card ---------- */
+function Card({ l, onView, inCompare, toggle }) {
+  return (
+    <article className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+      <Pic l={l} />
+      <div className="flex flex-1 flex-col gap-1 p-5">
+        <p className="inline-block self-start rounded-md bg-soft px-2 py-1 text-xs font-medium text-muted">Sample listing — for academic demonstration only</p>
+        <h3 className="mt-1 text-lg font-semibold">{l.name}</h3>
+        <p className="text-sm text-muted">{l.area}, {l.city}</p>
+        <p className="mt-2 font-semibold">{money(l.price)} <span className="text-xs font-normal text-muted">(illustrative)</span></p>
+        <p className="mt-1 text-sm"><span className="rounded bg-soft px-2 py-0.5">{l.type} room</span></p>
+        <p className="mt-2 text-sm text-muted">{l.fac.join(" · ")}</p>
+        <div className="mt-auto flex flex-wrap items-center gap-3 pt-4">
+          <Btn onClick={() => onView(l.id)}>View Details</Btn>
+          {toggle && (
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4" checked={inCompare} onChange={() => toggle(l.id)} /> Compare</label>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/* ---------- Home ---------- */
+function Home({ go, search, onView }) {
+  const [f, setF] = useState({ q: "", max: "", type: "Any" });
+  const submit = e => { e.preventDefault(); search({ ...EMPTY, q: f.q, max: f.max, type: f.type }); };
+  return (
+    <>
+      <section className="bg-navy text-white">
+        <div className="mx-auto max-w-6xl px-4 py-16">
+          <h1 className="max-w-2xl text-4xl font-bold leading-tight md:text-6xl">Find a room that feels like home.</h1>
+          <p className="mt-4 max-w-2xl text-slate-300">Explore student accommodation options across Sierra Leone. Compare costs, locations and facilities to find a space that suits your needs.</p>
+          <form onSubmit={submit} className="mt-8 grid gap-3 rounded-xl bg-white p-4 text-navy md:grid-cols-4 shadow-lg" aria-label="Search accommodation">
+            <Field label="Location or area" id="h-q"><input id="h-q" className={inp} placeholder="e.g. Kissy, Bo" value={f.q} onChange={e => setF({ ...f, q: e.target.value })} /></Field>
+            <Field label="Monthly budget (SLE, max)" id="h-b"><input id="h-b" type="number" min="0" className={inp} placeholder="e.g. 1500" value={f.max} onChange={e => setF({ ...f, max: e.target.value })} /></Field>
+            <Field label="Room type" id="h-t"><select id="h-t" className={inp} value={f.type} onChange={e => setF({ ...f, type: e.target.value })}><option>Any</option><option>Single</option><option>Shared</option></select></Field>
+            <div className="flex items-end"><Btn className="w-full py-2.5">Search Accommodation</Btn></div>
+          </form>
+          <p className="mt-3 text-xs text-slate-300">Search runs on fictional sample listings only — not verified properties, prices or contacts.</p>
+        </div>
+      </section>
+      <section className="mx-auto mt-12 grid max-w-6xl gap-4 px-4 md:grid-cols-2">
+        {[["Single", "Single Rooms", "Your own space for study and rest, ideal if you value privacy and quiet."], ["Shared", "Shared Rooms", "Share with fellow students to keep monthly costs lower and make friends."]].map(([t, h, d]) => (
+          <div key={t} className="rounded-xl border border-slate-200 bg-soft p-6"><h2 className="text-xl font-semibold">{h}</h2><p className="mt-2 text-sm text-muted">{d}</p><Btn variant="green" className="mt-4" onClick={() => search({ ...EMPTY, type: t })}>Browse {h}</Btn></div>
+        ))}
+      </section>
+      <section className="mx-auto mt-12 max-w-6xl px-4">
+        <h2 className="text-2xl font-bold">How it works</h2>
+        <ol className="mt-4 grid gap-6 md:grid-cols-3">
+          {[["Search", "Choose a location, budget and room type."], ["Compare", "Review accommodation costs and facilities."], ["Enquire", "Find the provider's contact information and follow up directly."]].map(([h, d], i) => (
+            <li key={h} className="rounded-xl border border-slate-200 p-5"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand font-bold text-white">{i + 1}</span><h3 className="mt-3 font-semibold">{h}</h3><p className="text-sm text-muted">{d}</p></li>
+          ))}
+        </ol>
+      </section>
+      <section className="mx-auto mt-12 max-w-6xl px-4">
+        <h2 className="text-2xl font-bold">Featured accommodation</h2>
+        <p className="text-sm text-muted">Demonstration data only — not verified listings.</p>
+        <div className="mt-4 grid gap-6 md:grid-cols-3">{LISTINGS.slice(0, 3).map(l => <Card key={l.id} l={l} onView={onView} />)}</div>
+      </section>
+      <section className="mx-auto mt-12 max-w-6xl px-4">
+        <h2 className="text-2xl font-bold">Why RoomLink SL?</h2>
+        <ul className="mt-4 grid gap-6 md:grid-cols-3">
+          {["Explore options in one place.", "Compare costs and facilities.", "Make more informed accommodation decisions."].map(t => <li key={t} className="rounded-xl bg-soft p-5 font-medium">✓ {t}</li>)}
+        </ul>
+      </section>
+    </>
+  );
+}
+
+/* ---------- Listings ---------- */
+function Listings({ f, setF, onView, compare, toggle }) {
+  const res = useMemo(() => {
+    let r = LISTINGS.filter(l =>
+      (!f.q || (l.area + " " + l.city + " " + l.name).toLowerCase().includes(f.q.toLowerCase())) &&
+      (f.min === "" || l.price >= +f.min) && (f.max === "" || l.price <= +f.max) &&
+      (f.type === "Any" || l.type === f.type) && f.fac.every(x => l.fac.includes(x)));
+    if (f.sort === "asc") r = [...r].sort((a, b) => a.price - b.price);
+    if (f.sort === "desc") r = [...r].sort((a, b) => b.price - a.price);
+    return r;
+  }, [f]);
+  const set = (k, v) => setF({ ...f, [k]: v });
+  const togFac = x => set("fac", f.fac.includes(x) ? f.fac.filter(y => y !== x) : [...f.fac, x]);
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-10">
+      <h1 className="text-3xl font-bold">Explore Accommodation</h1>
+      <p className="mt-2 text-muted">Filter the sample listings by area, budget, room type and facilities, then add up to three to compare.</p>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[280px_1fr]">
+        <form className="space-y-4 rounded-xl border border-slate-200 bg-soft p-4" aria-label="Filters" onSubmit={e => e.preventDefault()}>
+          <Field label="Location or area" id="f-q"><input id="f-q" className={inp} value={f.q} onChange={e => set("q", e.target.value)} placeholder="e.g. Freetown" /></Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Min (SLE)" id="f-min"><input id="f-min" type="number" min="0" className={inp} value={f.min} onChange={e => set("min", e.target.value)} /></Field>
+            <Field label="Max (SLE)" id="f-max"><input id="f-max" type="number" min="0" className={inp} value={f.max} onChange={e => set("max", e.target.value)} /></Field>
+          </div>
+          <Field label="Room type" id="f-t"><select id="f-t" className={inp} value={f.type} onChange={e => set("type", e.target.value)}><option>Any</option><option>Single</option><option>Shared</option></select></Field>
+          <fieldset><legend className="mb-1 text-sm font-medium">Facilities</legend>
+            {FACILITIES.map(x => <label key={x} className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={f.fac.includes(x)} onChange={() => togFac(x)} /> {x}</label>)}
+          </fieldset>
+          <Field label="Sort by price" id="f-s"><select id="f-s" className={inp} value={f.sort} onChange={e => set("sort", e.target.value)}><option value="none">Default</option><option value="asc">Low to high</option><option value="desc">High to low</option></select></Field>
+          <Btn variant="outline" type="button" className="w-full" onClick={() => setF(EMPTY)}>Clear all filters</Btn>
+        </form>
+        <div>
+          <p className="mb-3 text-sm font-medium" aria-live="polite">{res.length} {res.length === 1 ? "listing" : "listings"} found</p>
+          {res.length ? (
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-2">{res.map(l => <Card key={l.id} l={l} onView={onView} inCompare={compare.includes(l.id)} toggle={toggle} />)}</div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center">
+              <h2 className="text-lg font-semibold">No listings match your filters</h2>
+              <p className="mt-1 text-sm text-muted">Try widening your budget or removing a facility.</p>
+              <Btn className="mt-4" onClick={() => setF(EMPTY)}>Clear all filters</Btn>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Detail modal ---------- */
+function Detail({ l, close, inCompare, toggle }) {
+  return (
+    <div className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-navy/60 p-4" role="dialog" aria-modal="true" aria-labelledby="d-title">
+      <div className="my-6 w-full max-w-2xl rounded-xl bg-white p-5">
+        <Pic l={l} big />
+        <p className="mt-4 text-xs font-medium text-leaf">Sample listing — for academic demonstration only</p>
+        <h2 id="d-title" className="text-2xl font-bold">{l.name}</h2>
+        <p className="text-muted">{l.area}, {l.city}, Sierra Leone</p>
+        <p className="mt-3 text-lg font-semibold">{money(l.price)} <span className="text-xs font-normal text-muted">(illustrative, not verified)</span></p>
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+          <div><dt className="font-medium">Room type</dt><dd className="text-muted">{l.type}</dd></div>
+          <div><dt className="font-medium">Facilities</dt><dd className="text-muted">{l.fac.join(", ")}</dd></div>
+        </dl>
+        <h3 className="mt-4 font-semibold">Description</h3><p className="text-sm text-muted">{l.desc}</p>
+        <div className="mt-4 rounded-lg bg-soft p-3 text-sm"><p className="font-semibold">Contact (sample information only)</p><p>{l.phone}</p><p>{l.email}</p></div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Btn variant={inCompare ? "outline" : "green"} onClick={() => toggle(l.id)}>{inCompare ? "Remove from Compare" : "Add to Compare"}</Btn>
+          <Btn variant="outline" onClick={close}>Back to listings</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Compare ---------- */
+function Compare({ ids, remove, go }) {
+  const items = ids.map(id => LISTINGS.find(l => l.id === id));
+  if (!items.length) return (
+    <div className="mx-auto max-w-3xl px-4 py-16 text-center">
+      <h1 className="text-3xl font-bold">Compare Accommodation</h1>
+      <p className="mt-3 text-muted">You haven't selected any listings yet. Pick up to three from the listings page.</p>
+      <Btn className="mt-5" onClick={() => go("listings")}>Browse accommodation</Btn>
+    </div>
+  );
+  const rows = [["Location", l => l.area + ", " + l.city], ["Monthly cost", l => money(l.price)], ["Room type", l => l.type], ["Facilities", l => l.fac.join(", ")], ["Contact (sample)", l => l.phone + " · " + l.email]];
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-10">
+      <h1 className="text-3xl font-bold">Compare Accommodation</h1>
+      <p className="mt-2 text-muted">{items.length} of 3 selected. All details are sample data.</p>
+      <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <caption className="sr-only">Side-by-side comparison of selected listings</caption>
+          <thead className="bg-soft"><tr><th scope="col" className="p-3">Property</th>
+            {items.map(l => <th scope="col" key={l.id} className="p-3 align-top"><span className="block text-base">{l.name}</span><button className="mt-1 text-xs font-medium text-red-700 underline" onClick={() => remove(l.id)}>Remove</button></th>)}</tr></thead>
+          <tbody>{rows.map(([h, fn]) => <tr key={h} className="border-t border-slate-200"><th scope="row" className="p-3 font-medium">{h}</th>{items.map(l => <td key={l.id} className="p-3 text-muted">{fn(l)}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+      <Btn variant="outline" className="mt-5" onClick={() => go("listings")}>Back to search</Btn>
+    </div>
+  );
+}
+
+/* ---------- Static pages ---------- */
+const Page = ({ title, children }) => <div className="mx-auto max-w-3xl px-4 py-10"><h1 className="text-3xl font-bold">{title}</h1><div className="mt-4 space-y-4 text-muted">{children}</div></div>;
+const About = () => (
+  <Page title="About RoomLink SL">
+    <p>RoomLink SL is a student-designed concept, not an established nationwide service. It explores how a simple website could make finding student accommodation clearer.</p>
+    <h2 className="text-xl font-semibold text-navy">Mission</h2><p>Help students explore options, compare costs and facilities, and make more informed accommodation decisions.</p>
+    <h2 className="text-xl font-semibold text-navy">Who it's for</h2><p>University and college students in Sierra Leone looking for a room that suits their budget and location.</p>
+    <h2 className="text-xl font-semibold text-navy">Core principles</h2>
+    <ul className="list-disc pl-5"><li><b>Clarity:</b> plain information, shown side by side.</li><li><b>Accessibility:</b> usable on any device, with keyboard support.</li><li><b>Informed decisions:</b> students choose with the full picture.</li></ul>
+  </Page>
+);
+const Services = () => (
+  <Page title="Services">
+    <h2 className="text-xl font-semibold text-navy">Available in this prototype</h2>
+    <ul className="list-disc pl-5"><li>Accommodation search</li><li>Budget and location filtering</li><li>Comparison of room types, prices and facilities</li><li>Sample provider contact information</li></ul>
+    <h2 className="text-xl font-semibold text-navy">Would need future verification or partnerships</h2>
+    <ul className="list-disc pl-5"><li>Verified listings, real prices and live availability</li><li>Real provider contacts and enquiry delivery</li><li>Guidance for evaluating accommodation (checklists for visits, questions to ask)</li></ul>
+  </Page>
+);
+
+function Contact() {
+  const [v, setV] = useState({ name: "", email: "", subject: "", message: "" });
+  const [err, setErr] = useState({});
+  const [done, setDone] = useState(false);
+  const submit = e => {
+    e.preventDefault();
+    const x = {};
+    if (!v.name.trim()) x.name = "Please enter your full name.";
+    if (!v.email.trim()) x.email = "Please enter your email address.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) x.email = "Please enter a valid email address.";
+    if (!v.subject.trim()) x.subject = "Please enter a subject.";
+    if (!v.message.trim()) x.message = "Please enter a message.";
+    setErr(x); setDone(!Object.keys(x).length);
+    if (!Object.keys(x).length) setV({ name: "", email: "", subject: "", message: "" });
+  };
+  const F = (k, label, area) => (
+    <Field label={label + " *"} id={"c-" + k}>
+      {area ? <textarea id={"c-" + k} rows="4" className={inp} value={v[k]} onChange={e => setV({ ...v, [k]: e.target.value })} aria-invalid={!!err[k]} aria-describedby={"e-" + k} />
+        : <input id={"c-" + k} className={inp} value={v[k]} onChange={e => setV({ ...v, [k]: e.target.value })} aria-invalid={!!err[k]} aria-describedby={"e-" + k} />}
+      <p id={"e-" + k} className="mt-1 text-xs text-red-700">{err[k]}</p>
+    </Field>
+  );
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10">
+      <h1 className="text-3xl font-bold">Contact</h1>
+      <p className="mt-2 text-muted">Placeholder contact details: hello@roomlink.example · +232 00 000 000</p>
+      {done && <p role="status" className="mt-4 rounded-lg border border-slate-200 bg-soft p-3 text-sm text-navy">Demonstration only: your form passed validation, but no email was sent.</p>}
+      <form noValidate onSubmit={submit} className="mt-6 space-y-4">
+        {F("name", "Full name")}{F("email", "Email address")}{F("subject", "Subject")}{F("message", "Message", true)}
+        <Btn>Submit</Btn>
+      </form>
+    </div>
+  );
+}
+
+/* ---------- App ---------- */
+function App() {
+  const [page, setPage] = useState("home");
+  const [filters, setFilters] = useState(EMPTY);
+  const [compare, setCompare] = useState([]);
+  const [view, setView] = useState(null);
+  const [msg, setMsg] = useState("");
+  const go = p => { setPage(p); setView(null); window.scrollTo(0, 0); };
+  const search = f => { setFilters(f); go("listings"); };
+  const toggle = id => {
+    if (compare.includes(id)) { setCompare(compare.filter(x => x !== id)); setMsg(""); }
+    else if (compare.length >= 3) setMsg("You can compare up to three listings. Remove one to add another.");
+    else { setCompare([...compare, id]); setMsg(""); }
+  };
+  const l = view && LISTINGS.find(x => x.id === view);
+  return (
+    <>
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:p-2">Skip to content</a>
+      <div className="bg-navy px-4 py-1.5 text-center text-xs text-slate-200">Academic prototype — all listings, prices and contact details are fictional sample data.</div>
+      <Header page={page} go={go} count={compare.length} />
+      <div aria-live="assertive" className={msg ? "border-b border-slate-200 bg-soft px-4 py-2 text-center text-sm font-medium text-navy" : "sr-only"}>{msg}</div>
+      <main id="main">
+        {page === "home" && <Home go={go} search={search} onView={setView} />}
+        {page === "listings" && <Listings f={filters} setF={setFilters} onView={setView} compare={compare} toggle={toggle} />}
+        {page === "compare" && <Compare ids={compare} remove={id => { setCompare(compare.filter(x => x !== id)); setMsg(""); }} go={go} />}
+        {page === "about" && <About />}
+        {page === "services" && <Services />}
+        {page === "contact" && <Contact />}
+      </main>
+      {l && <Detail l={l} close={() => setView(null)} inCompare={compare.includes(l.id)} toggle={toggle} />}
+      <Footer go={go} />
+    </>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
